@@ -3,19 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reserva de Tecnología Semanal - Turno Mañana</title>
+    <title>Reserva de Tecnología - Turno Mañana</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 font-sans p-4 md:p-6">
 
-    <div class="max-w-5xl mx-auto">
-        <header class="mb-8 text-center">
-            <!-- 🤫 TRIPLE CLIC AQUÍ PARA REINICIAR -->
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-8 text-center bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <!-- 🤫 TRIPLE CLIC EN EL TÍTULO PARA REINICIAR LA SEMANA -->
             <h1 id="tituloSecreto" class="text-3xl font-bold text-emerald-800 cursor-pointer select-none">
-                Reserva de Recursos - Turno Mañana
+                📱 Reserva de Recursos - Turno Mañana
             </h1>
-            <p class="text-gray-600 mt-2">Módulos compartidos en tiempo real (Stock Diario: 8 PCs y 3 TVs).</p>
+            <p class="text-gray-500 mt-1 text-sm">
+                Selecciona un módulo para gestionar o realizar tu reserva.
+            </p>
             
             <button id="btnLimpiarSemana" class="hidden mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs rounded shadow uppercase tracking-wider transition mx-auto">
                 🔄 Reiniciar Toda la Semana (Admin Mañana)
@@ -24,17 +26,17 @@
 
         <!-- CONTENEDOR DE DÍAS DE LA SEMANA -->
         <div id="contenedorSemana" class="space-y-6">
-            <!-- Los días se dibujan aquí dinámicamente -->
+            <!-- Los días y módulos se crean dinámicamente -->
         </div>
     </div>
 
-    <!-- VENTANA FLOTANTE (MODAL) -->
-    <div id="miModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden p-4">
+    <!-- VENTANA FLOTANTE (MODAL DE RESERVA) -->
+    <div id="miModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden p-4 z-50">
         <div class="bg-white p-6 rounded-lg shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <h3 id="modalTitulo" class="text-xl font-bold text-emerald-800 mb-2">Gestionar Módulo</h3>
             
             <div class="mb-4 bg-gray-50 p-3 rounded border">
-                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Reservas actuales en este turno:</h4>
+                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Reservas en este turno:</h4>
                 <div id="listaReservasActuales" class="space-y-2 text-sm text-gray-800"></div>
             </div>
 
@@ -64,7 +66,6 @@
                         <option value="Segunda">Segunda</option>
                         <option value="Economía">Economía</option>
                         <option value="Sociales">Sociales</option>
-                        <option value="Naturales">Naturales</option>
                     </select>
                 </div>
 
@@ -81,7 +82,7 @@
         </div>
     </div>
 
-    <!-- LOGICA DE FIREBASE SEMANAL (TURNO MAÑANA) -->
+    <!-- LÓGICA DE FIREBASE (TURNO MAÑANA) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
         import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
@@ -100,54 +101,55 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // 🎯 RUTA EN BASE DE DATOS EXCLUSIVA PARA LA MAÑANA
+        // NODO EN BASE DE DATOS EXCLUSIVO PARA LA MAÑANA
         const NODO_DB = "reservas_manana";
 
         const STOCK_MAX_PC = 8;
         const STOCK_MAX_TV = 3;
         const DIAS = ["lunes", "martes", "miercoles", "jueves", "viernes"];
-        const MODULOS = ["modulo1", "modulo2", "modulo3"];
+        
+        // ⏰ MÓDULOS Y HORARIOS DEL TURNO MAÑANA
+        const MODULOS = [
+            { id: "modulo1", nombre: "1° Módulo", horario: "07:45 a 09:05 hs" },
+            { id: "modulo2", nombre: "2° Módulo", horario: "09:20 a 10:40 hs" },
+            { id: "modulo3", nombre: "3° Módulo", horario: "10:50 a 12:10 hs" },
+            { id: "poshora", nombre: "Poshora (7ª hs)", horario: "12:10 a 12:50 hs" }
+        ];
 
         let diaActual = "";
         let moduloActual = "";
         let estadoGlobalSemana = {};
 
-        // 📅 DETECTAR DÍA ACTUAL REAL
         const numeroDiaHoy = new Date().getDay(); 
 
-        // 🛠️ DIBUJAR LA ESTRUCTURA VISUAL BASE
+        // 🛠️ DIBUJAR ESTRUCTURA VISUAL BASE
         const contenedor = document.getElementById("contenedorSemana");
-        DIAS.forEach((dia, index) => {
-            const numeroDiaContenedor = index + 1;
-            const diaYaPaso = numeroDiaHoy >= 1 && numeroDiaHoy <= 5 && numeroDiaContenedor < numeroDiaHoy;
-
+        DIAS.forEach((dia) => {
             let modulosHtml = "";
             MODULOS.forEach(mod => {
-                const numMod = mod === "modulo1" ? "1° Módulo" : mod === "modulo2" ? "2° Módulo" : "3° Módulo";
-                
                 modulosHtml += `
-                    <div id="card-${dia}-${mod}" class="border-2 p-4 rounded-lg transition shadow-sm">
-                        <div class="flex justify-between items-center mb-2">
-                            <span id="titulo-mod-${dia}-${mod}" class="font-bold">${numMod}</span>
-                            <span id="badge-${dia}-${mod}" class="text-xs px-2 py-0.5 rounded-full font-semibold">Cargando...</span>
+                    <div id="card-${dia}-${mod.id}" class="border-2 p-4 rounded-lg transition shadow-sm">
+                        <div class="flex justify-between items-center mb-1">
+                            <span id="titulo-mod-${dia}-${mod.id}" class="font-bold text-sm">${mod.nombre}</span>
+                            <span id="badge-${dia}-${mod.id}" class="text-xs px-2 py-0.5 rounded-full font-semibold">Cargando...</span>
                         </div>
-                        <div id="info-${dia}-${mod}" class="space-y-1 text-sm">
-                        </div>
+                        <p class="text-xs text-gray-500 mb-2 font-medium">⏰ ${mod.horario}</p>
+                        <div id="info-${dia}-${mod.id}" class="space-y-1 text-sm"></div>
                     </div>
                 `;
             });
 
             contenedor.innerHTML += `
                 <div id="box-dia-${dia}" class="bg-white p-6 rounded-lg shadow-md border-t-4 border-emerald-600">
-                    <h2 id="head-dia-${dia}" class="text-2xl font-bold mb-4 border-b pb-2 uppercase flex items-center justify-between">
+                    <h2 id="head-dia-${dia}" class="text-2xl font-bold mb-4 border-b pb-2 uppercase flex items-center justify-between text-gray-800">
                         <span>📅 ${dia}</span>
                     </h2>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">${modulosHtml}</div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">${modulosHtml}</div>
                 </div>
             `;
         });
 
-        // 👁️ ESCUCHAR LA BASE DE DATOS (NODO MAÑANA)
+        // 👁️ ESCUCHAR BASE DE DATOS
         onValue(ref(db, NODO_DB), (snapshot) => {
             const data = snapshot.val() || {};
             estadoGlobalSemana = data;
@@ -158,37 +160,35 @@
                 
                 const boxDia = document.getElementById(`box-dia-${dia}`);
                 const headDia = document.getElementById(`head-dia-${dia}`);
+                
                 if (diaYaPaso) {
-                    boxDia.className = "bg-white p-6 rounded-lg shadow-sm border-t-4 border-gray-300 bg-gray-50 opacity-80";
+                    boxDia.className = "bg-white p-6 rounded-lg shadow-sm border-t-4 border-gray-300 bg-gray-50 opacity-75";
                     headDia.className = "text-2xl font-bold text-gray-400 mb-4 border-b pb-2 uppercase flex items-center justify-between";
-                    if (!headDia.innerHTML.includes("Inhabilitado")) {
-                        headDia.innerHTML += '<span class="text-xs bg-gray-200 text-gray-500 font-normal px-2 py-1 rounded-sm normal-case tracking-normal">Inhabilitado (Paso)</span>';
-                    }
                 } else {
                     boxDia.className = "bg-white p-6 rounded-lg shadow-md border-t-4 border-emerald-600";
                     headDia.className = "text-2xl font-bold text-gray-800 mb-4 border-b pb-2 uppercase flex items-center justify-between";
                 }
 
                 MODULOS.forEach(mod => {
-                    const card = document.getElementById(`card-${dia}-${mod}`);
-                    const badge = document.getElementById(`badge-${dia}-${mod}`);
-                    const info = document.getElementById(`info-${dia}-${mod}`);
-                    const txtTitulo = document.getElementById(`titulo-mod-${dia}-${mod}`);
+                    const card = document.getElementById(`card-${dia}-${mod.id}`);
+                    const badge = document.getElementById(`badge-${dia}-${mod.id}`);
+                    const info = document.getElementById(`info-${dia}-${mod.id}`);
+                    const txtTitulo = document.getElementById(`titulo-mod-${dia}-${mod.id}`);
                     if (!card) return;
                     
                     let pcsUsadas = 0;
                     let tvsUsadas = 0;
                     let renglonesHtml = "";
 
-                    if (data[dia] && data[dia][mod]) {
-                        Object.keys(data[dia][mod]).forEach(key => {
-                            const res = data[dia][mod][key];
+                    if (data[dia] && data[dia][mod.id]) {
+                        Object.keys(data[dia][mod.id]).forEach(key => {
+                            const res = data[dia][mod.id][key];
                             if (!res || !res.curso || !res.tipo) return;
 
                             if (res.tipo === "PC") pcsUsadas += res.cantidad || 0;
                             if (res.tipo === "TV") tvsUsadas += res.cantidad || 0;
                             
-                            renglonesHtml += `<p class="truncate">🔹 <b>${res.curso} ${res.division || ''}:</b> ${res.cantidad} ${res.tipo}</p>`;
+                            renglonesHtml += `<p class="truncate text-xs">🔹 <b>${res.curso} ${res.division || ''}:</b> ${res.cantidad} ${res.tipo}</p>`;
                         });
                     }
 
@@ -197,39 +197,37 @@
 
                     if (diaYaPaso) {
                         card.onclick = null;
-                        txtTitulo.className = "font-bold text-gray-400";
+                        txtTitulo.className = "font-bold text-gray-400 text-sm";
                         info.className = "space-y-1 text-sm text-gray-400";
-                        
                         card.className = "border-2 border-gray-200 bg-gray-100 p-4 rounded-lg cursor-not-allowed shadow-inner";
                         badge.className = "text-xs bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full font-semibold";
                         
                         if (pcsUsadas === 0 && tvsUsadas === 0) {
                             badge.innerText = "Libre";
-                            info.innerHTML = `<p class="text-xs italic text-gray-400">Nadie reservó este módulo</p>`;
+                            info.innerHTML = `<p class="text-xs italic text-gray-400">Sin reservas</p>`;
                         } else {
-                            badge.innerText = "Cerrado";
+                            badge.innerText = "Finalizado";
                             info.innerHTML = renglonesHtml;
                         }
-
                     } else {
-                        card.onclick = () => abrirModalSemanal(dia, mod);
-                        txtTitulo.className = "font-bold text-gray-800";
+                        card.onclick = () => abrirModalSemanal(dia, mod.id);
+                        txtTitulo.className = "font-bold text-gray-800 text-sm";
                         info.className = "space-y-1 text-sm text-gray-700";
 
                         if (pcsUsadas === 0 && tvsUsadas === 0) {
                             card.className = "border-2 border-emerald-500 bg-emerald-50 p-4 rounded-lg cursor-pointer hover:bg-emerald-100 transition shadow-sm";
                             badge.className = "text-xs bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded-full font-semibold";
-                            badge.innerText = "Todo Libre";
-                            info.innerHTML = `<p class="text-xs text-gray-500">💻 Disponibles: ${STOCK_MAX_PC} PCs | 📺 TVs: 3</p>`;
+                            badge.innerText = "Disponible";
+                            info.innerHTML = `<p class="text-xs text-gray-500">💻 Libres: ${STOCK_MAX_PC} | 📺 Libres: 3</p>`;
                         } else if (pcsLibres <= 0 && tvsLibres <= 0) {
                             card.className = "border-2 border-red-500 bg-red-50 p-4 rounded-lg cursor-pointer hover:bg-red-100 transition shadow-sm opacity-90";
                             badge.className = "text-xs bg-red-200 text-red-800 px-2 py-0.5 rounded-full font-semibold";
-                            badge.innerText = "Módulo Agotado";
+                            badge.innerText = "Agotado";
                             info.innerHTML = renglonesHtml;
                         } else {
                             card.className = "border-2 border-orange-500 bg-orange-50 p-4 rounded-lg cursor-pointer hover:bg-orange-100 transition shadow-sm";
                             badge.className = "text-xs bg-orange-200 text-orange-800 px-2 py-0.5 rounded-full font-semibold";
-                            badge.innerText = `Quedan ${pcsLibres} PCs / ${tvsLibres} TVs`;
+                            badge.innerText = `Quedan ${pcsLibres} PC / ${tvsLibres} TV`;
                             info.innerHTML = renglonesHtml;
                         }
                     }
@@ -238,34 +236,35 @@
         });
 
         // 🔓 ABRIR MODAL
-        window.abrirModalSemanal = function(dia, mod) {
+        window.abrirModalSemanal = function(dia, modId) {
             diaActual = dia;
-            moduloActual = mod;
-            const numMod = mod === "modulo1" ? "1° Módulo" : mod === "modulo2" ? "2° Módulo" : "3° Módulo";
-            document.getElementById("modalTitulo").innerText = `Gestionar: ${dia.toUpperCase()} - ${numMod}`;
+            moduloActual = modId;
+            
+            const objMod = MODULOS.find(m => m.id === modId);
+            document.getElementById("modalTitulo").innerText = `Gestionar: ${dia.toUpperCase()} - ${objMod.nombre} (${objMod.horario})`;
 
             let pcsUsadas = 0;
             let tvsUsadas = 0;
             const divLista = document.getElementById("listaReservasActuales");
             divLista.innerHTML = "";
 
-            if (estadoGlobalSemana[dia] && estadoGlobalSemana[dia][mod]) {
-                Object.keys(estadoGlobalSemana[dia][mod]).forEach(key => {
-                    const res = estadoGlobalSemana[dia][mod][key];
+            if (estadoGlobalSemana[dia] && estadoGlobalSemana[dia][modId]) {
+                Object.keys(estadoGlobalSemana[dia][modId]).forEach(key => {
+                    const res = estadoGlobalSemana[dia][modId][key];
                     if (!res || !res.curso || !res.tipo) return;
 
                     if (res.tipo === "PC") pcsUsadas += res.cantidad || 0;
                     if (res.tipo === "TV") tvsUsadas += res.cantidad || 0;
 
                     divLista.innerHTML += `
-                        <div class="flex justify-between items-center bg-white p-2 rounded border shadow-xs">
-                            <span>🎓 <b>${res.curso} (${res.division || ''})</b> pidió ${res.cantidad} ${res.tipo}/s</span>
-                            <button type="button" onclick="eliminarReservaIndividual('${dia}', '${mod}', '${key}')" class="text-xs bg-red-100 text-red-700 font-bold px-2 py-1 rounded hover:bg-red-200">❌ Quitar</button>
+                        <div class="flex justify-between items-center bg-white p-2 rounded border shadow-xs text-xs">
+                            <span>🎓 <b>${res.curso} (${res.division || ''})</b> reservó ${res.cantidad} ${res.tipo}/s</span>
+                            <button type="button" onclick="eliminarReservaIndividual('${dia}', '${modId}', '${key}')" class="text-xs bg-red-100 text-red-700 font-bold px-2 py-1 rounded hover:bg-red-200">❌ Cancelar</button>
                         </div>
                     `;
                 });
             } else {
-                divLista.innerHTML = '<p class="text-xs text-gray-400 italic">No hay recursos reservados todavía.</p>';
+                divLista.innerHTML = '<p class="text-xs text-gray-400 italic">Sin reservas cargadas aún.</p>';
             }
 
             let pcsLibres = STOCK_MAX_PC - pcsUsadas;
@@ -276,7 +275,7 @@
 
             if (pcsLibres > 0) {
                 for (let i = 1; i <= pcsLibres; i++) {
-                    selectRecurso.innerHTML += `<option value="PC-${i}">💻 Llevar ${i} Computadora${i > 1 ? 's' : ''} (Quedan ${pcsLibres})</option>`;
+                    selectRecurso.innerHTML += `<option value="PC-${i}">💻 ${i} Computadora${i > 1 ? 's' : ''} (Disponibles: ${pcsLibres})</option>`;
                 }
             } else {
                 selectRecurso.innerHTML += `<option value="" disabled class="text-red-500 font-semibold">❌ Computadoras Agotadas</option>`;
@@ -284,7 +283,7 @@
 
             if (tvsLibres > 0) {
                 for (let i = 1; i <= tvsLibres; i++) {
-                    selectRecurso.innerHTML += `<option value="TV-${i}">📺 Llevar ${i} Televisor${i > 1 ? 'es' : ''} (Quedan ${tvsLibres})</option>`;
+                    selectRecurso.innerHTML += `<option value="TV-${i}">📺 ${i} Televisor${i > 1 ? 'es' : ''} (Disponibles: ${tvsLibres})</option>`;
                 }
             } else {
                 selectRecurso.innerHTML += `<option value="" disabled class="text-red-500 font-semibold">❌ Televisores Agotados</option>`;
@@ -293,9 +292,8 @@
             document.getElementById("miModal").classList.remove("hidden");
         };
 
-        // 🗑️ ELIMINAR RESERVA INDIVIDUAL
         window.eliminarReservaIndividual = function(dia, mod, keyId) {
-            if (confirm("¿Querés cancelar esta reserva específica?")) {
+            if (confirm("¿Confirmas la cancelación de esta reserva?")) {
                 remove(ref(db, `${NODO_DB}/${dia}/${mod}/${keyId}`)).then(() => {
                     window.abrirModalSemanal(dia, mod);
                 });
@@ -327,30 +325,24 @@
             });
         };
 
-        // 🔄 REINICIAR SEMANA
+        // Reinicio semanal oculto (Triple Clic)
         document.getElementById("btnLimpiarSemana").onclick = function() {
-            if (confirm("⚠️ ¡ATENCIÓN ADMINISTRADORAS!\n¿Estás segura de que querés borrar TODAS las reservas del TURNO MAÑANA para arrancar de cero?")) {
+            if (confirm("⚠️ ¿Deseas reiniciar TODA la semana del TURNO MAÑANA a cero?")) {
                 remove(ref(db, NODO_DB)).then(() => {
-                    alert("¡Semana del Turno Mañana reiniciada con éxito!");
+                    alert("¡Semana del Turno Mañana reiniciada exitosamente!");
                     document.getElementById("btnLimpiarSemana").classList.add("hidden");
                 });
             }
         };
 
-        // 🤫 TRIPLE CLIC
         let conteoClics = 0;
         let timerClics;
         document.getElementById("tituloSecreto").onclick = function() {
             conteoClics++;
             clearTimeout(timerClics);
-            
             if (conteoClics === 3) {
                 const btn = document.getElementById("btnLimpiarSemana");
-                if (btn.classList.contains("hidden")) {
-                    btn.classList.remove("hidden");
-                } else {
-                    btn.classList.add("hidden");
-                }
+                btn.classList.toggle("hidden");
                 conteoClics = 0;
             }
             timerClics = setTimeout(() => { conteoClics = 0; }, 500);
